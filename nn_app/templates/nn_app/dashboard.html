@@ -1,0 +1,164 @@
+{% extends 'nn_app/base.html' %}
+{% block title %}NeuralForge — Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .hero {
+    padding: 4rem 0 3rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+    position: relative;
+  }
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: .75rem;
+    color: var(--accent);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    margin-bottom: .8rem;
+  }
+  .hero h1 { margin-bottom: 1rem; }
+  .hero p { color: var(--muted); max-width: 540px; line-height: 1.7; }
+
+  .session-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    transition: border-color .2s, transform .2s;
+    text-decoration: none;
+    color: inherit;
+  }
+  .session-card:hover { border-color: var(--accent); transform: translateX(4px); }
+  .session-info h3 { margin-bottom: .3rem; }
+  .session-meta { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+  .session-stats { display: flex; gap: 1.5rem; text-align: right; }
+  .s-stat-val { font-family: var(--mono); font-size: 1.1rem; font-weight: 700; }
+  .s-stat-lbl { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+
+  .empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 4rem; margin-bottom: 1rem; opacity: .3; }
+  .empty-state h2 { margin-bottom: .7rem; color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-tag">// Neural Network Laboratory</div>
+    <h1>Build Neural Networks<br><span class="accent">From Scratch</span></h1>
+    <p>Design, train, and analyse feedforward neural networks built purely in Python + NumPy — no TensorFlow, no PyTorch.</p>
+    <div style="margin-top:1.8rem; display:flex; gap:1rem; flex-wrap:wrap;">
+      <a href="{% url 'create_network' %}" class="btn btn-primary">+ New Network</a>
+      <a href="#sessions" class="btn btn-ghost">View Sessions</a>
+    </div>
+  </div>
+
+  <!-- Feature strip -->
+  <div class="grid-3 mb3">
+    <div class="card stat-block">
+      <div class="stat-value accent">100%</div>
+      <div class="stat-label">Pure NumPy — no ML framework</div>
+    </div>
+    <div class="card stat-block">
+      <div class="stat-value accent2">{{ sessions|length }}</div>
+      <div class="stat-label">Training sessions</div>
+    </div>
+    <div class="card stat-block">
+      <div class="stat-value accent3">5</div>
+      <div class="stat-label">Built-in datasets</div>
+    </div>
+  </div>
+
+  <!-- Sessions list -->
+  <div id="sessions">
+    <div class="flex items-center justify-between mb2">
+      <h2>Recent Sessions</h2>
+      <a href="{% url 'create_network' %}" class="btn btn-primary" style="padding:.5rem 1rem;">+ New</a>
+    </div>
+
+    {% if sessions %}
+      <div style="display:flex; flex-direction:column; gap:.8rem;">
+        {% for s in sessions %}
+        <div class="session-card" style="position:relative;">
+          <div class="session-info">
+            <h3>{{ s.name }}</h3>
+            <div class="session-meta">
+              <span class="badge badge-cyan">{{ s.dataset|upper }}</span>
+              <span class="badge badge-pink">{{ s.epochs }} epochs</span>
+              <span class="badge badge-green">lr {{ s.learning_rate }}</span>
+            </div>
+          </div>
+          <div class="session-stats">
+            {% if s.final_loss is not None %}
+            <div>
+              <div class="s-stat-val accent">{{ s.final_loss|floatformat:4 }}</div>
+              <div class="s-stat-lbl">Final Loss</div>
+            </div>
+            <div>
+              <div class="s-stat-val accent3">{{ s.final_accuracy|floatformat:1 }}%</div>
+              <div class="s-stat-lbl">Accuracy</div>
+            </div>
+            {% else %}
+            <div><div class="s-stat-val muted">—</div><div class="s-stat-lbl">Not trained</div></div>
+            {% endif %}
+            <div style="display:flex;flex-direction:column;gap:.5rem;">
+              {% if s.weights %}
+              <a href="{% url 'results' s.pk %}" class="btn btn-ghost" style="padding:.4rem .9rem;font-size:.75rem;">Results</a>
+              {% else %}
+              <a href="{% url 'train_network' s.pk %}" class="btn btn-primary" style="padding:.4rem .9rem;font-size:.75rem;">Train</a>
+              {% endif %}
+              <a href="{% url 'delete_session' s.pk %}" class="btn btn-danger" style="padding:.4rem .9rem;font-size:.75rem;" onclick="return confirm('Delete this session?')">Delete</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="icon">⬡</div>
+        <h2>No sessions yet</h2>
+        <p>Create your first neural network to get started.</p>
+        <a href="{% url 'create_network' %}" class="btn btn-primary" style="margin-top:1.5rem;">Create Network</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Quick Explainer -->
+  <div class="card" style="margin-top:3rem; padding:2rem;">
+    <h2 class="mb2">How It Works</h2>
+    <div class="grid-3">
+      <div>
+        <div style="font-size:1.8rem; margin-bottom:.7rem;">① Configure</div>
+        <p style="color:var(--muted);line-height:1.7;">Choose a dataset (XOR, AND, Circles, Moons…), set hidden layers, activation functions, learning rate and epochs.</p>
+      </div>
+      <div>
+        <div style="font-size:1.8rem; margin-bottom:.7rem;">② Train</div>
+        <p style="color:var(--muted);line-height:1.7;">Pure NumPy forward-pass + back-propagation trains the network with gradient descent. Watch loss and accuracy live.</p>
+      </div>
+      <div>
+        <div style="font-size:1.8rem; margin-bottom:.7rem;">③ Analyse</div>
+        <p style="color:var(--muted);line-height:1.7;">Explore training curves, inspect predictions vs targets, and run custom inputs through the trained model.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

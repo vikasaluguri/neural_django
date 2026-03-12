@@ -1,0 +1,279 @@
+{% extends 'nn_app/base.html' %}
+{% block title %}NeuralForge — Configure Network{% endblock %}
+
+{% block extra_head %}
+<style>
+  .page-header { padding: 2.5rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2.5rem; }
+  .page-header h1 { font-size: 1.9rem; }
+
+  .config-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+  @media(max-width:800px) { .config-layout { grid-template-columns: 1fr; } }
+
+  .section-title {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .arch-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 1.5rem 1rem;
+    min-height: 80px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    justify-content: center;
+  }
+  .arch-layer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .arch-circles { display: flex; flex-direction: column; gap: 4px; }
+  .arch-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 1px solid var(--muted);
+    transition: background .3s;
+  }
+  .arch-dot.input  { background: rgba(0,229,255,.4); border-color: var(--accent); }
+  .arch-dot.hidden { background: rgba(255,64,129,.3); border-color: var(--accent2); }
+  .arch-dot.output { background: rgba(105,255,71,.4); border-color: var(--accent3); }
+  .arch-label { font-size: .65rem; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .arch-arrow { color: var(--muted); font-size: 1.1rem; }
+
+  .dataset-cards { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+  .dataset-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .9rem 1rem;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+  }
+  .dataset-card:hover { border-color: var(--accent); background: rgba(0,229,255,.04); }
+  .dataset-card.active { border-color: var(--accent); background: rgba(0,229,255,.08); }
+  .dataset-card input[type=radio] { display: none; }
+  .dataset-icon { font-size: 1.5rem; }
+  .dataset-info h4 { font-size: .88rem; font-weight: 600; margin-bottom: .15rem; }
+  .dataset-info p  { font-size: .72rem; color: var(--muted); }
+
+  .tip { font-size: .78rem; color: var(--muted); margin-top: .3rem; line-height: 1.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <div class="mono muted" style="font-size:.8rem;margin-bottom:.5rem;">// CONFIGURE</div>
+    <h1>Design Your <span class="accent">Neural Network</span></h1>
+  </div>
+
+  <form method="POST" action="{% url 'create_network' %}">
+    {% csrf_token %}
+    <div class="config-layout">
+
+      <!-- Left: Config -->
+      <div>
+        <!-- Basic -->
+        <div class="card mb3">
+          <div class="section-title">Basic Settings</div>
+          <div class="form-group">
+            <label>Session Name</label>
+            <input type="text" name="name" value="My First Network" required />
+          </div>
+          <div class="form-group">
+            <label>Loss Function</label>
+            <select name="loss_function">
+              <option value="mse">MSE — Mean Squared Error</option>
+              <option value="binary_crossentropy">Binary Cross-Entropy</option>
+            </select>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Learning Rate</label>
+              <input type="number" name="learning_rate" value="0.1" step="0.001" min="0.0001" max="10" id="lr_input" />
+            </div>
+            <div class="form-group">
+              <label>Epochs</label>
+              <input type="number" name="epochs" value="2000" min="100" max="50000" step="100" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Architecture -->
+        <div class="card mb3">
+          <div class="section-title">Architecture</div>
+          <div class="arch-preview" id="arch-preview">
+            <!-- Populated by JS -->
+          </div>
+          <div class="form-group">
+            <label>Hidden Layers (comma-separated neuron counts)</label>
+            <input type="text" name="hidden_layers" id="hidden_layers" value="4,4"
+                   placeholder="e.g. 8, 4, 4" />
+            <p class="tip">Example: <code>4,4</code> → two hidden layers with 4 neurons each.</p>
+          </div>
+          <div class="form-group">
+            <label>Activations per Layer (comma-separated)</label>
+            <input type="text" name="activations" id="activations" value="tanh,tanh,sigmoid"
+                   placeholder="tanh,tanh,sigmoid" />
+            <p class="tip">One activation per hidden + output layer. Options: <code>relu</code>, <code>sigmoid</code>, <code>tanh</code>.</p>
+          </div>
+        </div>
+
+        <!-- Dataset -->
+        <div class="card mb3">
+          <div class="section-title">Dataset</div>
+          <div class="dataset-cards" id="dataset-cards">
+            {% for ds, icon, desc in dataset_choices %}
+            <label class="dataset-card {% if forloop.first %}active{% endif %}">
+              <input type="radio" name="dataset" value="{{ ds }}" {% if forloop.first %}checked{% endif %} />
+              <div class="dataset-icon">{{ icon }}</div>
+              <div class="dataset-info">
+                <h4>{{ ds|upper }}</h4>
+                <p>{{ desc }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:1rem;">
+          Create &amp; Configure →
+        </button>
+      </div>
+
+      <!-- Right: Info panel -->
+      <div>
+        <div class="card mb3">
+          <div class="section-title">About Datasets</div>
+          <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+              <h4 class="mb1">XOR</h4>
+              <p class="tip">Classic non-linearly separable problem. 4 samples. Requires at least 1 hidden layer to solve.</p>
+            </div>
+            <div>
+              <h4 class="mb1">AND / OR</h4>
+              <p class="tip">Linearly separable logic gates. Great for verifying your network works.</p>
+            </div>
+            <div>
+              <h4 class="mb1">Circles</h4>
+              <p class="tip">200 points in two concentric circles. Tests ability to learn curved boundaries.</p>
+            </div>
+            <div>
+              <h4 class="mb1">Moons</h4>
+              <p class="tip">Two interleaved half-moons. A popular benchmark for nonlinear classifiers.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb3">
+          <div class="section-title">Activation Guide</div>
+          <table style="width:100%;font-size:.8rem;border-collapse:collapse;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.5rem 0;font-family:var(--mono);color:var(--accent);">relu</td>
+              <td style="padding:.5rem;color:var(--muted);">Best for hidden layers</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.5rem 0;font-family:var(--mono);color:var(--accent2);">sigmoid</td>
+              <td style="padding:.5rem;color:var(--muted);">Output for binary class</td>
+            </tr>
+            <tr>
+              <td style="padding:.5rem 0;font-family:var(--mono);color:var(--accent3);">tanh</td>
+              <td style="padding:.5rem;color:var(--muted);">Zero-centred, hidden</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Recommended Configs</div>
+          <div style="display:flex;flex-direction:column;gap:.7rem;">
+            <button type="button" class="btn btn-ghost" style="font-size:.78rem;" onclick="applyPreset('4,4','tanh,tanh,sigmoid',0.3,5000)">XOR Starter (4,4)</button>
+            <button type="button" class="btn btn-ghost" style="font-size:.78rem;" onclick="applyPreset('8,8,4','relu,relu,relu,sigmoid',0.05,5000)">Circles Deep (8,8,4)</button>
+            <button type="button" class="btn btn-ghost" style="font-size:.78rem;" onclick="applyPreset('16,8','tanh,tanh,sigmoid',0.05,3000)">Moons Wide (16,8)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  const datasetChoices = [
+    {v:'xor',    input:2, output:1},
+    {v:'and',    input:2, output:1},
+    {v:'or',     input:2, output:1},
+    {v:'circles',input:2, output:1},
+    {v:'moons',  input:2, output:1},
+  ];
+  let currentDataset = 'xor';
+  let currentInput = 2;
+
+  // Dataset card selection
+  document.querySelectorAll('.dataset-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.dataset-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      const v = card.querySelector('input').value;
+      currentDataset = v;
+      const ds = datasetChoices.find(d => d.v === v);
+      if(ds) currentInput = ds.input;
+      drawArch();
+    });
+  });
+
+  function parseHidden() {
+    const raw = document.getElementById('hidden_layers').value;
+    return raw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+  }
+
+  function drawArch() {
+    const hidden = parseHidden();
+    const layers = [currentInput, ...hidden, 1];
+    const preview = document.getElementById('arch-preview');
+    const labels  = ['Input', ...hidden.map((_,i)=>`H${i+1}`), 'Output'];
+    const types   = ['input', ...hidden.map(()=>'hidden'), 'output'];
+    const MAX_DOTS = 6;
+
+    preview.innerHTML = layers.map((n, i) => {
+      const show = Math.min(n, MAX_DOTS);
+      const extra = n > MAX_DOTS ? `<div style="font-size:.65rem;color:var(--muted);text-align:center;">+${n-MAX_DOTS}</div>` : '';
+      const dots = Array.from({length: show}, () =>
+        `<div class="arch-dot ${types[i]}"></div>`
+      ).join('');
+      const arrow = i < layers.length - 1 ? '<div class="arch-arrow">→</div>' : '';
+      return `
+        <div class="arch-layer">
+          <div class="arch-circles">${dots}</div>
+          ${extra}
+          <div class="arch-label">${labels[i]}<br><span style="color:var(--accent)">${n}</span></div>
+        </div>
+        ${arrow}`;
+    }).join('');
+  }
+
+  document.getElementById('hidden_layers').addEventListener('input', drawArch);
+  drawArch();
+
+  function applyPreset(hidden, acts, lr, ep) {
+    document.getElementById('hidden_layers').value = hidden;
+    document.getElementById('activations').value = acts;
+    document.querySelector('[name=learning_rate]').value = lr;
+    document.querySelector('[name=epochs]').value = ep;
+    drawArch();
+  }
+</script>
+{% endblock %}
