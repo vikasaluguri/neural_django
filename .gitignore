@@ -1,3 +1,5 @@
-.venv
-neural_project/__pycache__
-nn_app/__pycache__
+.venv/
+__pycache__/
+*.pyc
+db.sqlite3
+.env
